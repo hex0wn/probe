@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"sync"
 )
 
@@ -10,12 +10,12 @@ const (
 )
 
 func main() {
-	logrus.Infof("switcher %s", VERSION)
+	fmt.Printf("switcher %s\n", VERSION)
 	wg := &sync.WaitGroup{}
 	for _, v := range config.Rules {
 		wg.Add(1)
 		go listen(v, wg)
 	}
 	wg.Wait()
-	logrus.Infof("program exited")
+	fmt.Printf("program exited\n")
 }

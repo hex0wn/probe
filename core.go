@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
 	"net"
 	"sync"
 	"time"
+	"fmt"
+	"github.com/sirupsen/logrus"
 )
 
 func listen(rule *ruleStructure, wg *sync.WaitGroup) {
@@ -12,15 +13,15 @@ func listen(rule *ruleStructure, wg *sync.WaitGroup) {
 	//监听
 	listener, err := net.Listen("tcp", rule.Listen)
 	if err != nil {
-		logrus.Errorf("[%s] failed to listen at %s", rule.Name, rule.Listen)
+		errorLog.Errorf("[%s] failed to listen at %s", rule.Name, rule.Listen)
 		return
 	}
-	logrus.Infof("[%s] listing at %s", rule.Name, rule.Listen)
+	fmt.Printf("[%s] listing at %s\n", rule.Name, rule.Listen)
 	for {
 		//处理客户端连接
 		conn, err := listener.Accept()
 		if err != nil {
-			logrus.Errorf("[%s] failed to accept at %s", rule.Name, rule.Listen)
+			errorLog.Errorf("[%s] failed to accept at %s", rule.Name, rule.Listen)
 			break
 		}
 		//判断是否是正则模式
@@ -33,13 +34,19 @@ func listen(rule *ruleStructure, wg *sync.WaitGroup) {
 	return
 }
 
+func parseTCPAddr(addr net.Addr) (string, int) {
+        ip := addr.(*net.TCPAddr).IP.String()
+        port := addr.(*net.TCPAddr).Port
+        return ip, port
+}
+
 func handleNormal(conn net.Conn, rule *ruleStructure) {
 	var target net.Conn
 	//正常模式下挨个连接直到成功连接
 	for _, v := range rule.Targets {
 		c, err := net.Dial("tcp", v.Address)
 		if err != nil {
-			logrus.Errorf("[%s] try to handle connection (%s) failed because target (%s) connected failed, try next target.",
+			errorLog.Errorf("[%s] try to handle connection (%s) failed because target (%s) connected failed, try next target.",
 				rule.Name, conn.RemoteAddr(), v.Address)
 			continue
 		}
@@ -47,11 +54,22 @@ func handleNormal(conn net.Conn, rule *ruleStructure) {
 		break
 	}
 	if target == nil {
-		logrus.Errorf("[%s] unable to handle connection (%s) because all targets connected failed",
+		errorLog.Errorf("[%s] unable to handle connection (%s) because all targets connected failed",
 			rule.Name, conn.RemoteAddr())
 		return
 	}
-	logrus.Debugf("[%s] handle connection (%s) to target (%s)", rule.Name, conn.RemoteAddr(), target.RemoteAddr())
+
+    src_ip, src_port := parseTCPAddr(conn.RemoteAddr())
+    probe_ip, probe_port := parseTCPAddr(conn.LocalAddr())
+    dest_ip, dest_port := parseTCPAddr(target.RemoteAddr())
+	accessLog.WithFields(logrus.Fields{
+        "src_ip": src_ip,
+        "src_port": src_port,
+        "probe_ip": probe_ip,
+        "probe_port": probe_port,
+        "dest_ip": dest_ip,
+        "dest_port": dest_port,
+	  }).Info("handle connection sucessfully")
 
 	//io桥
 	go tcpBridge(conn, target)
@@ -64,7 +82,7 @@ func handleRegexp(conn net.Conn, rule *ruleStructure) {
 	//获取第一个数据包
 	firstPacket, err := waitFirstPacket(conn)
 	if err != nil {
-		logrus.Errorf("[%s] unable to handle connection (%s) because failed to get first packet : %s",
+		errorLog.Errorf("[%s] unable to handle connection (%s) because failed to get first packet : %s",
 			rule.Name, conn.RemoteAddr(), err.Error())
 		return
 	}
@@ -77,7 +95,7 @@ func handleRegexp(conn net.Conn, rule *ruleStructure) {
 		}
 		c, err := net.Dial("tcp", v.Address)
 		if err != nil {
-			logrus.Errorf("[%s] try to handle connection (%s) failed because target (%s) connected failed, try next match target.",
+			errorLog.Errorf("[%s] try to handle connection (%s) failed because target (%s) connected failed, try next match target.",
 				rule.Name, conn.RemoteAddr(), v.Address)
 			continue
 		}
@@ -85,12 +103,23 @@ func handleRegexp(conn net.Conn, rule *ruleStructure) {
 		break
 	}
 	if target == nil {
-		logrus.Errorf("[%s] unable to handle connection (%s) because no match target",
+		errorLog.Errorf("[%s] unable to handle connection (%s) because no match target",
 			rule.Name, conn.RemoteAddr())
 		return
 	}
 
-	logrus.Debugf("[%s] handle connection (%s) to target (%s)", rule.Name, conn.RemoteAddr(), target.RemoteAddr())
+    src_ip, src_port := parseTCPAddr(conn.RemoteAddr())
+    probe_ip, probe_port := parseTCPAddr(conn.LocalAddr())
+    dest_ip, dest_port := parseTCPAddr(target.RemoteAddr())
+	accessLog.WithFields(logrus.Fields{
+        "src_ip": src_ip,
+        "src_port": src_port,
+        "probe_ip": probe_ip,
+        "probe_port": probe_port,
+        "dest_ip": dest_ip,
+        "dest_port": dest_port,
+	  }).Info("handle connection sucessfully")
+
 	//匹配到了，去除掉刚才设定的超时
 	conn.SetReadDeadline(time.Time{})
 	//把第一个数据包发送给目标

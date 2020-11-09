@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"regexp"
+	"errors"
 )
 
 type configStructure struct {
-	LogLevel string           `json:"log_level"`
+	LogPath  string	`json:"log_path"`	
 	Rules    []*ruleStructure `json:"rules"`
 }
 
@@ -30,38 +30,33 @@ var config *configStructure
 func init() {
 	buf, err := ioutil.ReadFile("config.json")
 	if err != nil {
-		logrus.Fatalf("failed to load config.json: %s", err.Error())
+		fmt.Printf("failed to load config.json: %s\n", err.Error())
 	}
 
 	if err := json.Unmarshal(buf, &config); err != nil {
-		logrus.Fatalf("failed to load config.json: %s", err.Error())
+		fmt.Printf("failed to load config.json: %s\n", err.Error())
 	}
 
 	if len(config.Rules) == 0 {
-		logrus.Fatalf("empty rule", err.Error())
+		fmt.Printf("empty rule\n", err.Error())
 	}
-	lvl, err := logrus.ParseLevel(config.LogLevel)
-	if err != nil {
-		logrus.Fatalf("invalid log_level")
-	}
-	logrus.SetLevel(lvl)
 
 	for i, v := range config.Rules {
 		if err := v.verify(); err != nil {
-			logrus.Fatalf("verity rule failed at pos %d : %s", i, err.Error())
+			fmt.Printf("verity rule failed at pos %d : %s\n", i, err.Error())
 		}
 	}
 }
 
 func (c *ruleStructure) verify() error {
 	if c.Name == "" {
-		return fmt.Errorf("empty name")
+		return errors.New("empty name")
 	}
 	if c.Listen == "" {
-		return fmt.Errorf("invalid listen address")
+		return errors.New("invalid listen address")
 	}
 	if len(c.Targets) == 0 {
-		return fmt.Errorf("invalid targets")
+		return errors.New("invalid targets")
 	}
 	if c.EnableRegexp {
 		if c.FirstPacketTimeout == 0 {
@@ -70,12 +65,12 @@ func (c *ruleStructure) verify() error {
 	}
 	for i, v := range c.Targets {
 		if v.Address == "" {
-			return fmt.Errorf("invalid address at pos %d", i)
+			return errors.New(fmt.Sprintf("invalid address at pos %d\n", i))
 		}
 		if c.EnableRegexp {
 			r, err := regexp.Compile(v.Regexp)
 			if err != nil {
-				return fmt.Errorf("invalid regexp at pos %d : %s", i, err.Error())
+				return errors.New(fmt.Sprintf("invalid regexp at pos %d : %s\n", i, err.Error()))
 			}
 			v.regexp = r
 		}
