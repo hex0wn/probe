@@ -12,7 +12,7 @@ var errorLog = logrus.New()
 
 func init() {
 	dir := config.LogPath
-	suffix := ".%Y%m%d%H%M"
+	suffix := ".%Y%m%d"
 	// 日志轮转
 	filename := path.Join(dir, "access.log")
 	accessWriter, _ := rotatelogs.New(
