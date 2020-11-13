@@ -1,5 +1,6 @@
 {
   "log_path": "./log/",
+  "ip_prefix": "10.",
   "rules": [
     {
       "name": "test",

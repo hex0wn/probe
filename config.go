@@ -9,7 +9,8 @@ import (
 )
 
 type configStructure struct {
-	LogPath  string	`json:"log_path"`	
+	LogPath  string	`json:"log_path"`
+	IPrefix  string	`json:"ip_prefix"`	
 	Rules    []*ruleStructure `json:"rules"`
 }
 
