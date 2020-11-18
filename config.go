@@ -6,6 +6,9 @@ import (
 	"io/ioutil"
 	"regexp"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 type configStructure struct {
@@ -29,7 +32,10 @@ type ruleStructure struct {
 var config *configStructure
 
 func init() {
-	buf, err := ioutil.ReadFile("config.json")
+	execFile, err := exec.LookPath(os.Args[0])
+    execPath, _ := filepath.Abs(execFile)
+    dir := filepath.Dir(execPath)
+	buf, err := ioutil.ReadFile(path.Join(dir, "config.json"))
 	if err != nil {
 		fmt.Printf("failed to load config.json: %s\n", err.Error())
 	}
